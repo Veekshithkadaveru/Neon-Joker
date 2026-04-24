@@ -1,5 +1,6 @@
 package app.krafted.neonjoker.ui
 
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +13,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import app.krafted.neonjoker.viewmodel.GameViewModel
@@ -21,7 +23,9 @@ fun HomeRoute(
     onNewGame: () -> Unit,
     onContinue: () -> Unit,
     onLeaderboard: () -> Unit,
-    viewModel: GameViewModel = hiltViewModel()
+    viewModel: GameViewModel = hiltViewModel(
+        viewModelStoreOwner = LocalContext.current as ComponentActivity
+    )
 ) {
     val uiState by viewModel.uiState.collectAsState()
     HomeScreen(

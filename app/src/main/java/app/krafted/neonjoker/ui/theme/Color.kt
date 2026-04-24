@@ -16,3 +16,14 @@ val CyberSurfaceVariant = Color(0xFF1B1B35)
 val CyberOutline = Color(0xFF3F3F67)
 val CyberOnDark = Color(0xFFEAFBFF)
 val CyberOnDarkMuted = Color(0xFF97B0C3)
+
+fun tierNeonColor(tier: Int): Color = when (tier) {
+    1 -> NeonCyan
+    2 -> NeonPink
+    3 -> NeonPurple
+    4 -> NeonRed
+    5 -> NeonGold
+    6 -> NeonGreen
+    7 -> NeonWhite
+    else -> CyberSurfaceVariant
+}

@@ -12,8 +12,17 @@ value class Grid(val values: IntArray) {
     }
 }
 
+data class TileMove(
+    val fromIndex: Int,
+    val toIndex: Int,
+    val tier: Int,
+    val merged: Boolean,
+    val mergedFrom: Pair<Int, Int>? = null,
+)
+
 data class SlideResult(
     val grid: Grid,
     val scoreDelta: Int,
     val moved: Boolean,
+    val moves: List<TileMove> = emptyList(),
 )

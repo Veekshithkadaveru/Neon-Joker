@@ -18,16 +18,31 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private data class UndoSnapshot(val grid: Grid, val score: Int)
+data class TileData(
+    val id: Long,
+    val cellIndex: Int,
+    val previousIndex: Int,
+    val tier: Int,
+    val isNew: Boolean = false,
+    val isMerged: Boolean = false,
+)
+
+private data class UndoSnapshot(
+    val grid: Grid,
+    val score: Int,
+    val tiles: Map<Long, TileData>,
+)
 
 data class GameUiState(
     val grid: List<Int> = List(16) { 0 },
+    val tiles: List<TileData> = emptyList(),
     val score: Int = 0,
     val bestScore: Int = 0,
     val canContinue: Boolean = false,
     val isGameOver: Boolean = false,
     val isWon: Boolean = false,
-    val canUndo: Boolean = false
+    val canUndo: Boolean = false,
+    val moveGeneration: Long = 0,
 )
 
 @HiltViewModel
@@ -39,14 +54,19 @@ class GameViewModel @Inject constructor(
 
     private val spawner = TileSpawner()
     private var undoSnapshot: UndoSnapshot? = null
+    private var nextTileId: Long = 1L
+    private var currentTiles: MutableMap<Long, TileData> = mutableMapOf()
 
     init {
         viewModelScope.launch {
             val save = gameDao.observeGameSave().firstOrNull()
             if (save != null) {
+                val gridValues = parseGridState(save.gridState)
+                val restoredTiles = buildTilesFromGrid(gridValues)
                 _uiState.update {
                     it.copy(
-                        grid = parseGridState(save.gridState),
+                        grid = gridValues,
+                        tiles = restoredTiles,
                         score = save.score,
                         bestScore = maxOf(it.bestScore, save.bestScore),
                         canContinue = true
@@ -64,9 +84,56 @@ class GameViewModel @Inject constructor(
         val result = GridEngine.slide(currentGrid, direction)
         if (!result.moved) return
 
-        undoSnapshot = UndoSnapshot(currentGrid, state.score)
+        undoSnapshot = UndoSnapshot(currentGrid, state.score, currentTiles.toMap())
 
-        val afterSpawn = spawner.spawn(result.grid)
+        val tileByCell = currentTiles.values.associateBy { it.cellIndex }
+        val newTiles = mutableListOf<TileData>()
+
+        for (move in result.moves) {
+            if (move.merged) {
+                val id = nextTileId++
+                newTiles.add(
+                    TileData(
+                        id = id,
+                        cellIndex = move.toIndex,
+                        previousIndex = move.mergedFrom!!.first,
+                        tier = move.tier,
+                        isMerged = true,
+                    )
+                )
+            } else {
+                val sourceTile = tileByCell[move.fromIndex]
+                val id = sourceTile?.id ?: nextTileId++
+                newTiles.add(
+                    TileData(
+                        id = id,
+                        cellIndex = move.toIndex,
+                        previousIndex = move.fromIndex,
+                        tier = move.tier,
+                    )
+                )
+            }
+        }
+
+        val spawnResult = spawner.spawnWithIndex(result.grid)
+        if (spawnResult.spawnedIndex >= 0) {
+            newTiles.add(
+                TileData(
+                    id = nextTileId++,
+                    cellIndex = spawnResult.spawnedIndex,
+                    previousIndex = spawnResult.spawnedIndex,
+                    tier = spawnResult.spawnedTier,
+                    isNew = true,
+                )
+            )
+        }
+
+        currentTiles.clear()
+        for (tile in newTiles) {
+            currentTiles[tile.id] = tile
+        }
+
+        val afterSpawn = spawnResult.grid
         val newScore = state.score + result.scoreDelta
         val newBest = maxOf(state.bestScore, newScore)
         val won = afterSpawn.values.any { it >= Grid.MAX_TIER }
@@ -74,12 +141,14 @@ class GameViewModel @Inject constructor(
 
         _uiState.value = state.copy(
             grid = afterSpawn.values.toList(),
+            tiles = newTiles.toList(),
             score = newScore,
             bestScore = newBest,
             isWon = won,
             isGameOver = gameOver,
             canUndo = true,
-            canContinue = !gameOver
+            canContinue = !gameOver,
+            moveGeneration = state.moveGeneration + 1,
         )
 
         persistCurrentState()
@@ -89,13 +158,22 @@ class GameViewModel @Inject constructor(
     fun undo() {
         val snapshot = undoSnapshot ?: return
         undoSnapshot = null
+
+        currentTiles.clear()
+        currentTiles.putAll(snapshot.tiles)
+        val restoredTiles = snapshot.tiles.values.map {
+            it.copy(isNew = false, isMerged = false, previousIndex = it.cellIndex)
+        }
+
         _uiState.update {
             it.copy(
                 grid = snapshot.grid.values.toList(),
+                tiles = restoredTiles,
                 score = snapshot.score,
                 canUndo = false,
                 isGameOver = false,
-                isWon = false
+                isWon = false,
+                moveGeneration = it.moveGeneration + 1,
             )
         }
         persistCurrentState()
@@ -105,12 +183,30 @@ class GameViewModel @Inject constructor(
         undoSnapshot = null
         val bestScore = _uiState.value.bestScore
         var grid = Grid.empty()
-        grid = spawner.spawn(grid)
-        grid = spawner.spawn(grid)
+
+        val spawn1 = spawner.spawnWithIndex(grid)
+        grid = spawn1.grid
+        val spawn2 = spawner.spawnWithIndex(grid)
+        grid = spawn2.grid
+
+        currentTiles.clear()
+        val tiles = mutableListOf<TileData>()
+        if (spawn1.spawnedIndex >= 0) {
+            val t = TileData(nextTileId++, spawn1.spawnedIndex, spawn1.spawnedIndex, spawn1.spawnedTier, isNew = true)
+            tiles.add(t)
+            currentTiles[t.id] = t
+        }
+        if (spawn2.spawnedIndex >= 0) {
+            val t = TileData(nextTileId++, spawn2.spawnedIndex, spawn2.spawnedIndex, spawn2.spawnedTier, isNew = true)
+            tiles.add(t)
+            currentTiles[t.id] = t
+        }
+
         _uiState.value = GameUiState(
             grid = grid.values.toList(),
+            tiles = tiles,
             bestScore = bestScore,
-            canContinue = true
+            canContinue = true,
         )
         persistCurrentState()
     }
@@ -142,5 +238,18 @@ class GameViewModel @Inject constructor(
     private fun parseGridState(raw: String): List<Int> {
         val values = raw.split(",").mapNotNull { it.toIntOrNull() }
         return if (values.size == 16) values else List(16) { 0 }
+    }
+
+    private fun buildTilesFromGrid(gridValues: List<Int>): List<TileData> {
+        currentTiles.clear()
+        val tiles = mutableListOf<TileData>()
+        for (i in gridValues.indices) {
+            if (gridValues[i] > 0) {
+                val t = TileData(nextTileId++, i, i, gridValues[i])
+                tiles.add(t)
+                currentTiles[t.id] = t
+            }
+        }
+        return tiles
     }
 }

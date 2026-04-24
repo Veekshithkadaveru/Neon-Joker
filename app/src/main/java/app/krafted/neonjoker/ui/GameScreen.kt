@@ -2,10 +2,8 @@ package app.krafted.neonjoker.ui
 
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -17,15 +15,17 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CutCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -36,22 +36,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import app.krafted.neonjoker.game.Direction
+import app.krafted.neonjoker.ui.components.AnimatedTile
 import app.krafted.neonjoker.ui.components.TierProgress
 import app.krafted.neonjoker.ui.components.cyberpunkGameGradientBrush
 import app.krafted.neonjoker.ui.components.neonGlow
@@ -62,8 +64,8 @@ import app.krafted.neonjoker.ui.theme.CyberSurface
 import app.krafted.neonjoker.ui.theme.NeonCyan
 import app.krafted.neonjoker.ui.theme.NeonGold
 import app.krafted.neonjoker.ui.theme.NeonRed
-import app.krafted.neonjoker.ui.theme.tierNeonColor
 import app.krafted.neonjoker.viewmodel.GameViewModel
+import app.krafted.neonjoker.viewmodel.TileData
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
@@ -85,6 +87,8 @@ fun GameRoute(
     val uiState by viewModel.uiState.collectAsState()
     GameScreen(
         grid = uiState.grid,
+        tiles = uiState.tiles,
+        moveGeneration = uiState.moveGeneration,
         score = uiState.score,
         bestScore = uiState.bestScore,
         canUndo = uiState.canUndo,
@@ -101,6 +105,8 @@ fun GameRoute(
 @Composable
 fun GameScreen(
     grid: List<Int>,
+    tiles: List<TileData>,
+    moveGeneration: Long,
     score: Int,
     bestScore: Int,
     canUndo: Boolean,
@@ -212,17 +218,19 @@ fun GameScreen(
                 }
             }
 
-            TierProgress(
-                highestTierOnBoard = highestTier,
-                modifier = Modifier.padding(top = 14.dp, bottom = 10.dp)
-            )
-
             GameGrid(
-                grid = grid,
+                tiles = tiles,
+                moveGeneration = moveGeneration,
                 onSwipe = onSwipe,
                 modifier = Modifier
+                    .padding(top = 20.dp)
                     .fillMaxWidth()
                     .aspectRatio(1f)
+            )
+
+            TierProgress(
+                highestTierOnBoard = highestTier,
+                modifier = Modifier.padding(top = 24.dp, bottom = 10.dp)
             )
 
             Spacer(modifier = Modifier.weight(1f, fill = true))
@@ -386,7 +394,8 @@ private fun HudStatCard(
 
 @Composable
 private fun GameGrid(
-    grid: List<Int>,
+    tiles: List<TileData>,
+    moveGeneration: Long,
     onSwipe: (Direction) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -404,27 +413,36 @@ private fun GameGrid(
         color = CyberBg.copy(alpha = 0.45f),
         border = BorderStroke(1.dp, CyberOutline.copy(alpha = 0.75f))
     ) {
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(8.dp)
         ) {
+            val cellSizeDp = maxWidth / 4
+            val cellSizePx = with(LocalDensity.current) { cellSizeDp.toPx() }
+
             for (r in 0 until 4) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                ) {
-                    for (c in 0 until 4) {
-                        val v = grid[r * 4 + c]
-                        GridCell(
-                            tier = v,
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .padding(4.dp)
-                        )
-                    }
+                for (c in 0 until 4) {
+                    EmptyCell(
+                        modifier = Modifier
+                            .offset(x = cellSizeDp * c, y = cellSizeDp * r)
+                            .size(cellSizeDp)
+                            .padding(4.dp)
+                    )
+                }
+            }
+
+            val sortedTiles = remember(tiles) {
+                tiles.sortedBy { if (it.isMerged) 1 else 0 }
+            }
+            for (tile in sortedTiles) {
+                key(tile.id) {
+                    AnimatedTile(
+                        tile = tile,
+                        cellSizePx = cellSizePx,
+                        cellSizeDp = cellSizeDp,
+                        moveGeneration = moveGeneration,
+                    )
                 }
             }
         }
@@ -432,79 +450,16 @@ private fun GameGrid(
 }
 
 @Composable
-private fun GridCell(
-    tier: Int,
-    modifier: Modifier = Modifier
-) {
-
-    val scale = remember { Animatable(1f) }
-    LaunchedEffect(tier) {
-        if (tier > 0) {
-            scale.snapTo(0.65f)
-            scale.animateTo(
-                targetValue = 1f,
-                animationSpec = spring(
-                    dampingRatio = 0.45f,
-                    stiffness = 420f
-                )
+private fun EmptyCell(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .border(
+                width = 1.dp,
+                color = CyberOutline.copy(alpha = 0.5f),
+                shape = CellShape
             )
-        }
-    }
-
-    if (tier == 0) {
-
-        Box(
-            modifier = modifier
-                .border(
-                    width = 1.dp,
-                    color = CyberOutline.copy(alpha = 0.5f),
-                    shape = CellShape
-                )
-                .background(CyberSurface.copy(alpha = 0.10f), CellShape)
-        )
-    } else {
-        val bg = tierNeonColor(tier)
-        val fg = if (tier >= 7) CyberBg else Color.White
-        val glowIntensity = 0.35f + (tier * 0.06f).coerceAtMost(0.25f)
-
-        Surface(
-            modifier = modifier
-                .scale(scale.value)
-                .neonGlow(
-                    color = bg,
-                    cornerRadius = 8.dp,
-                    blurRadius = 18.dp,
-                    spreadAlpha = glowIntensity
-                ),
-            shape = CellShape,
-            color = Color.Transparent,
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
-            tonalElevation = 0.dp,
-            shadowElevation = 0.dp
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                bg,
-                                bg.copy(alpha = 0.72f)
-                            )
-                        ),
-                        CellShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = tier.toString(),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = fg
-                )
-            }
-        }
-    }
+            .background(CyberSurface.copy(alpha = 0.10f), CellShape)
+    )
 }
 
 @Composable

@@ -16,12 +16,22 @@ object GridEngine {
         }
 
         var scoreDelta = 0
+        val allMoves = mutableListOf<TileMove>()
         val row = IntArray(SIZE)
         for (r in 0 until SIZE) {
             for (c in 0 until SIZE) row[c] = working[r * SIZE + c]
-            val (newRow, rowScore) = slideRowLeft(row)
-            scoreDelta += rowScore
-            for (c in 0 until SIZE) working[r * SIZE + c] = newRow[c]
+            val rowResult = slideRowLeft(row)
+            scoreDelta += rowResult.score
+            for (c in 0 until SIZE) working[r * SIZE + c] = rowResult.row[c]
+
+            for (m in rowResult.moves) {
+                val fromIdx = toOriginalIndex(r, m.fromCol, direction)
+                val toIdx = toOriginalIndex(r, m.toCol, direction)
+                val mergedFrom = m.mergedFromCols?.let { (c1, c2) ->
+                    toOriginalIndex(r, c1, direction) to toOriginalIndex(r, c2, direction)
+                }
+                allMoves.add(TileMove(fromIdx, toIdx, m.tier, m.merged, mergedFrom))
+            }
         }
 
         val oriented = when (direction) {
@@ -32,16 +42,37 @@ object GridEngine {
         }
 
         val moved = !oriented.contentEquals(source)
-        return SlideResult(Grid(oriented), scoreDelta, moved)
+        return SlideResult(Grid(oriented), scoreDelta, moved, allMoves)
     }
 
-    private fun slideRowLeft(row: IntArray): Pair<IntArray, Int> {
+    private data class RowTileMove(
+        val fromCol: Int,
+        val toCol: Int,
+        val tier: Int,
+        val merged: Boolean,
+        val mergedFromCols: Pair<Int, Int>? = null,
+    )
+
+    private data class RowSlideResult(
+        val row: IntArray,
+        val score: Int,
+        val moves: List<RowTileMove>,
+    )
+
+    private fun slideRowLeft(row: IntArray): RowSlideResult {
         val compacted = IntArray(SIZE)
+        val originCol = IntArray(SIZE) { -1 }
         var writeIdx = 0
-        for (v in row) if (v != 0) compacted[writeIdx++] = v
+        for (col in row.indices) {
+            if (row[col] != 0) {
+                compacted[writeIdx] = row[col]
+                originCol[writeIdx] = col
+                writeIdx++
+            }
+        }
 
         val merged = IntArray(SIZE)
-        val wasMerge = BooleanArray(SIZE)
+        val moves = mutableListOf<RowTileMove>()
         var outIdx = 0
         var scoreDelta = 0
         var i = 0
@@ -53,23 +84,46 @@ object GridEngine {
             }
             val canMerge = i + 1 < SIZE &&
                     compacted[i + 1] == v &&
-                    v < MAX_TIER &&
-                    !wasMerge[outIdx]
+                    v < MAX_TIER
             if (canMerge) {
                 val newTier = v + 1
                 merged[outIdx] = newTier
-                wasMerge[outIdx] = true
                 scoreDelta += 1 shl newTier
+                moves.add(
+                    RowTileMove(
+                        fromCol = originCol[i],
+                        toCol = outIdx,
+                        tier = newTier,
+                        merged = true,
+                        mergedFromCols = originCol[i] to originCol[i + 1],
+                    )
+                )
                 outIdx++
                 i += 2
             } else {
                 merged[outIdx] = v
+                moves.add(
+                    RowTileMove(
+                        fromCol = originCol[i],
+                        toCol = outIdx,
+                        tier = v,
+                        merged = false,
+                    )
+                )
                 outIdx++
                 i++
             }
         }
-        return merged to scoreDelta
+        return RowSlideResult(merged, scoreDelta, moves)
     }
+
+    private fun toOriginalIndex(workingRow: Int, workingCol: Int, direction: Direction): Int =
+        when (direction) {
+            Direction.LEFT -> workingRow * SIZE + workingCol
+            Direction.RIGHT -> workingRow * SIZE + (SIZE - 1 - workingCol)
+            Direction.UP -> workingCol * SIZE + workingRow
+            Direction.DOWN -> (SIZE - 1 - workingCol) * SIZE + workingRow
+        }
 
     private fun transpose(values: IntArray): IntArray {
         val out = IntArray(CELLS)

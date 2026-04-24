@@ -14,6 +14,9 @@ interface GameDao {
     @Upsert
     suspend fun upsertGameSave(gameSave: GameSave)
 
+    @Query("DELETE FROM game_save WHERE id = 1")
+    suspend fun deleteGameSave()
+
     @Insert
     suspend fun insertScoreRecord(scoreRecord: ScoreRecord)
 

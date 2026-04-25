@@ -1,12 +1,7 @@
 package app.krafted.neonjoker.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,39 +9,35 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CutCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import app.krafted.neonjoker.data.ScoreRecord
-import app.krafted.neonjoker.ui.components.NeonMenuButton
-import app.krafted.neonjoker.ui.components.cyberpunkGameGradientBrush
-import app.krafted.neonjoker.ui.components.neonGlow
-import app.krafted.neonjoker.ui.theme.CyberOnDarkMuted
-import app.krafted.neonjoker.ui.theme.CyberSurfaceVariant
-import app.krafted.neonjoker.ui.theme.NeonCyan
+import app.krafted.neonjoker.ui.components.SecondaryGhostButton
 import app.krafted.neonjoker.ui.theme.NeonGold
-import app.krafted.neonjoker.ui.theme.NeonPink
-import app.krafted.neonjoker.ui.theme.tierNeonColor
 import app.krafted.neonjoker.viewmodel.LeaderboardViewModel
-import kotlinx.coroutines.delay
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
-private val RowShape = CutCornerShape(topStart = 10.dp, bottomEnd = 10.dp)
+private val StageBg = Color(0xFF0D0B1E)
+private val SilverMedal = Color(0xFFC8C8D4)
+private val BronzeMedal = Color(0xFFCD7F32)
+private val RowShape = RoundedCornerShape(10.dp)
 
 @Composable
 fun LeaderboardRoute(
@@ -62,133 +53,110 @@ fun LeaderboardScreen(
     scores: List<ScoreRecord>,
     onBack: () -> Unit
 ) {
-    val titleShown = remember { MutableTransitionState(false) }
-    val listShown = remember { MutableTransitionState(false) }
-    LaunchedEffect(Unit) {
-        titleShown.targetState = true
-        delay(90)
-        listShown.targetState = true
-    }
-    val enter = fadeIn(tween(380, easing = FastOutSlowInEasing)) +
-        slideInVertically(tween(380, easing = FastOutSlowInEasing)) { it / 8 }
-
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(cyberpunkGameGradientBrush())
+            .background(StageBg)
+            .padding(horizontal = 18.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Column(
+        Text(
+            text = "LEADERBOARD",
+            color = Color.White,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Black,
+            letterSpacing = 2.sp,
+            textAlign = TextAlign.Center,
             modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            AnimatedVisibility(visibleState = titleShown, enter = enter) {
+                .fillMaxWidth()
+                .padding(bottom = 4.dp)
+        )
+
+        if (scores.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = "LEADERBOARD",
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        shadow = Shadow(
-                            color = NeonGold.copy(alpha = 0.75f),
-                            offset = Offset.Zero,
-                            blurRadius = 18f
-                        )
-                    ),
-                    color = NeonGold,
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    text = "No scores yet.\nPlay to claim the top spot!",
+                    color = Color.White.copy(alpha = 0.3f),
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
                 )
             }
-            AnimatedVisibility(
-                visibleState = listShown,
-                enter = enter,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(7.dp),
+                modifier = Modifier.weight(1f)
             ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    if (scores.isEmpty()) {
-                        Text(
-                            text = "No scores yet.\nPlay a round!",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = CyberOnDarkMuted,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(32.dp)
-                        )
-                    } else {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            itemsIndexed(
-                                items = scores,
-                                key = { _, record -> record.id }
-                            ) { index, record ->
-                                val rank = index + 1
-                                val accent = when (rank) {
-                                    1 -> NeonGold
-                                    2 -> NeonCyan
-                                    3 -> NeonPink
-                                    else -> tierNeonColor(((rank - 1) % 7) + 1)
-                                }
-                                LeaderboardRow(
-                                    rank = rank,
-                                    score = record.score,
-                                    accent = accent
-                                )
-                            }
-                        }
-                    }
+                itemsIndexed(
+                    items = scores,
+                    key = { _, record -> record.id }
+                ) { index, record ->
+                    LeaderboardRow(index = index, record = record)
                 }
             }
-            NeonMenuButton(
-                text = "BACK",
-                onClick = onBack,
-                enabled = true,
-                accent = NeonGold,
-                fillFraction = 0.88f,
-                modifier = Modifier.padding(top = 16.dp)
-            )
         }
+
+        SecondaryGhostButton(text = "← BACK", onClick = onBack)
     }
 }
 
 @Composable
-private fun LeaderboardRow(
-    rank: Int,
-    score: Int,
-    accent: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        shape = RowShape,
-        color = CyberSurfaceVariant.copy(alpha = 0.88f),
-        modifier = modifier
+private fun LeaderboardRow(index: Int, record: ScoreRecord) {
+    val (rankText, rankColor) = when (index) {
+        0 -> "🥇" to NeonGold
+        1 -> "🥈" to SilverMedal
+        2 -> "🥉" to BronzeMedal
+        else -> "#${index + 1}" to Color.White.copy(alpha = 0.3f)
+    }
+    Row(
+        modifier = Modifier
             .fillMaxWidth()
-            .neonGlow(
-                accent,
-                cornerRadius = 8.dp,
-                blurRadius = 12.dp,
-                spreadAlpha = 0.34f
-            )
+            .clip(RowShape)
+            .background(Color.White.copy(alpha = 0.05f), RowShape)
+            .border(1.dp, Color.White.copy(alpha = 0.07f), RowShape)
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Text(
+            text = rankText,
+            color = rankColor,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(40.dp)
+        )
+        Column(
+            modifier = Modifier.weight(1f)
         ) {
             Text(
-                text = "#$rank",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = accent
+                text = record.playerName,
+                color = Color.White.copy(alpha = 0.8f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
             )
             Text(
-                text = score.toString(),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                text = "${record.moves} moves",
+                color = Color.White,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold
             )
         }
+        Text(
+            text = formatScoreDate(record.createdAtMillis),
+            color = Color.White.copy(alpha = 0.25f),
+            fontSize = 10.sp
+        )
     }
 }
+
+private val ScoreDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
+
+private fun formatScoreDate(millis: Long): String =
+    Instant.ofEpochMilli(millis)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDate()
+        .format(ScoreDateFormatter)

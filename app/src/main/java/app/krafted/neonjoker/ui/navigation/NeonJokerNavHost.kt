@@ -41,7 +41,7 @@ fun NeonJokerNavHost(
         }
         composable(NeonJokerRoutes.Game) {
             GameRoute(
-                onBack = {
+                onHome = {
                     navController.popBackStack(
                         route = NeonJokerRoutes.Home,
                         inclusive = false

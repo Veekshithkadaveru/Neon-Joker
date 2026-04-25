@@ -21,7 +21,7 @@ object DataModule {
             context,
             AppDatabase::class.java,
             "neon_joker.db"
-        ).build()
+        ).fallbackToDestructiveMigration().build()
     }
 
     @Provides

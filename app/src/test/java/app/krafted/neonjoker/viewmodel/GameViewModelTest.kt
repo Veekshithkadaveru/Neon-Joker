@@ -74,18 +74,18 @@ class GameViewModelTest {
     }
 
     @Test
-    fun startNewGameResetsScorePreservesBestScore() = runTest {
+    fun startNewGameResetsScorePreservesLowestMoves() = runTest {
         viewModel.startNewGame()
         advanceUntilIdle()
         for (dir in Direction.entries) {
             viewModel.onSwipe(dir)
             advanceUntilIdle()
         }
-        val bestAfterPlay = viewModel.uiState.value.bestScore
+        val lowestMovesAfterPlay = viewModel.uiState.value.lowestMoves
         viewModel.startNewGame()
         advanceUntilIdle()
         assertEquals(0, viewModel.uiState.value.score)
-        assertEquals(bestAfterPlay, viewModel.uiState.value.bestScore)
+        assertEquals(lowestMovesAfterPlay, viewModel.uiState.value.lowestMoves)
     }
 
     @Test
@@ -185,11 +185,11 @@ class GameViewModelTest {
     @Test
     fun initRestoresFromSavedGame() = runTest {
         val savedGrid = "1,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0"
-        fakeDao.upsertGameSave(GameSave(gridState = savedGrid, score = 42, bestScore = 100))
+        fakeDao.upsertGameSave(GameSave(gridState = savedGrid, moves = 0, score = 42, lowestMoves = 100))
         val vm = GameViewModel(fakeDao)
         advanceUntilIdle()
         assertEquals(42, vm.uiState.value.score)
-        assertEquals(100, vm.uiState.value.bestScore)
+        assertEquals(100, vm.uiState.value.lowestMoves)
         assertTrue(vm.uiState.value.canContinue)
         assertEquals(1, vm.uiState.value.grid[0])
         assertEquals(2, vm.uiState.value.grid[5])
@@ -198,7 +198,7 @@ class GameViewModelTest {
     @Test
     fun initDoesNotContinueWonSavedGame() = runTest {
         val wonGrid = "7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
-        fakeDao.upsertGameSave(GameSave(gridState = wonGrid, score = 128, bestScore = 128))
+        fakeDao.upsertGameSave(GameSave(gridState = wonGrid, moves = 0, score = 128, lowestMoves = 128))
         val vm = GameViewModel(fakeDao)
 
         advanceUntilIdle()
@@ -210,7 +210,7 @@ class GameViewModelTest {
     @Test
     fun winningSwipeDisablesContinue() = runTest {
         val almostWonGrid = "6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
-        fakeDao.upsertGameSave(GameSave(gridState = almostWonGrid, score = 0, bestScore = 0))
+        fakeDao.upsertGameSave(GameSave(gridState = almostWonGrid, moves = 0, score = 0, lowestMoves = Int.MAX_VALUE))
         val vm = GameViewModel(fakeDao)
         advanceUntilIdle()
 

@@ -23,7 +23,7 @@ interface GameDao {
     @Query(
         """
         SELECT * FROM score_records
-        ORDER BY score DESC, createdAtMillis ASC
+        ORDER BY moves ASC, score DESC, createdAtMillis ASC
         LIMIT :limit
         """
     )

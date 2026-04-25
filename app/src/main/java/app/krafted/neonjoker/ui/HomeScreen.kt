@@ -66,6 +66,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import app.krafted.neonjoker.R
+import app.krafted.neonjoker.ui.components.PrimaryGradientButton
+import app.krafted.neonjoker.ui.components.SecondaryGhostButton
 import app.krafted.neonjoker.ui.components.neonGlow
 import app.krafted.neonjoker.ui.theme.NeonCyan
 import app.krafted.neonjoker.ui.theme.NeonGold
@@ -78,8 +80,6 @@ import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 private val StageBg = Color(0xFF0D0B1E)
-private val PrimaryGradStart = Color(0xFF7C4DFF)
-private val PrimaryGradEnd = Color(0xFF00B8D4)
 private val TitleMidViolet = Color(0xFFB39DDB)
 
 private val tierImages = intArrayOf(
@@ -101,7 +101,7 @@ fun HomeRoute(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     HomeScreen(
-        bestScore = uiState.bestScore,
+        moves = uiState.moves,
         canContinue = uiState.canContinue,
         onNewGame = {
             viewModel.startNewGame()
@@ -114,16 +114,16 @@ fun HomeRoute(
 
 @Composable
 fun HomeScreen(
-    bestScore: Int,
+    moves: Int,
     canContinue: Boolean,
     onNewGame: () -> Unit,
     onContinue: () -> Unit,
     onLeaderboard: () -> Unit,
 ) {
-    val animatedBest by animateIntAsState(
-        targetValue = bestScore,
+    val animatedMoves by animateIntAsState(
+        targetValue = if (moves == Int.MAX_VALUE) 0 else moves,
         animationSpec = tween(1500, easing = FastOutSlowInEasing),
-        label = "bestScore"
+        label = "moves"
     )
 
     Box(
@@ -177,7 +177,7 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(10.dp))
             GemStrip()
             Spacer(modifier = Modifier.height(14.dp))
-            BestScoreCard(score = animatedBest)
+            MovesCard(moves = animatedMoves)
             Spacer(modifier = Modifier.height(14.dp))
 
             PrimaryGradientButton(
@@ -395,7 +395,7 @@ private fun GemStrip() {
 }
 
 @Composable
-private fun BestScoreCard(score: Int) {
+private fun MovesCard(moves: Int) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -420,7 +420,7 @@ private fun BestScoreCard(score: Int) {
         ) {
             Column {
                 Text(
-                    text = "BEST SCORE",
+                    text = "MOVES",
                     style = TextStyle(
                         fontSize = 9.sp,
                         letterSpacing = 3.sp,
@@ -430,7 +430,7 @@ private fun BestScoreCard(score: Int) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = score.toString(),
+                    text = moves.toString(),
                     style = TextStyle(
                         fontSize = 34.sp,
                         fontWeight = FontWeight.Black,
@@ -461,79 +461,6 @@ private fun BestScoreCard(score: Int) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun PrimaryGradientButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    val s by animateFloatAsState(if (pressed) 0.96f else 1f, label = "ps")
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .graphicsLayer { scaleX = s; scaleY = s }
-            .neonGlow(
-                color = PrimaryGradStart,
-                cornerRadius = 14.dp,
-                blurRadius = 28.dp,
-                spreadAlpha = 0.6f,
-            )
-            .clip(RoundedCornerShape(14.dp))
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(PrimaryGradStart, PrimaryGradEnd)
-                )
-            )
-            .clickable(
-                interactionSource = source,
-                indication = null,
-                onClick = onClick,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = text,
-            style = TextStyle(
-                fontSize = 13.sp,
-                letterSpacing = 2.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-            )
-        )
-    }
-}
-
-@Composable
-private fun SecondaryGhostButton(
-    text: String,
-    onClick: () -> Unit,
-) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color.White.copy(alpha = 0.07f),
-            contentColor = Color.White.copy(alpha = 0.85f),
-        ),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.13f)),
-        shape = RoundedCornerShape(14.dp)
-    ) {
-        Text(
-            text = text,
-            style = TextStyle(
-                fontSize = 13.sp,
-                letterSpacing = 2.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        )
     }
 }
 

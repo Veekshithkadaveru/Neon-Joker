@@ -3,16 +3,23 @@ package app.krafted.neonjoker.ui
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,6 +38,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,12 +56,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import app.krafted.neonjoker.R
+import app.krafted.neonjoker.ui.components.PrimaryGradientButton
+import app.krafted.neonjoker.ui.components.SecondaryGhostButton
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import app.krafted.neonjoker.game.Direction
 import app.krafted.neonjoker.ui.components.AnimatedTile
@@ -58,7 +78,6 @@ import app.krafted.neonjoker.ui.components.TierProgress
 import app.krafted.neonjoker.ui.components.cyberpunkGameGradientBrush
 import app.krafted.neonjoker.ui.components.neonGlow
 import app.krafted.neonjoker.ui.theme.CyberBg
-import app.krafted.neonjoker.ui.theme.CyberOnDarkMuted
 import app.krafted.neonjoker.ui.theme.CyberOutline
 import app.krafted.neonjoker.ui.theme.CyberSurface
 import app.krafted.neonjoker.ui.theme.NeonCyan
@@ -72,13 +91,12 @@ import kotlin.math.abs
 private val HudShape = CutCornerShape(topStart = 14.dp, bottomEnd = 14.dp)
 private val GridFrameShape = CutCornerShape(16.dp)
 private val CellShape = CutCornerShape(10.dp)
-private val OverlayCardShape = CutCornerShape(topStart = 24.dp, bottomEnd = 24.dp)
 
 private const val SWIPE_THRESHOLD_PX = 48f
 
 @Composable
 fun GameRoute(
-    onBack: () -> Unit,
+    onHome: () -> Unit,
     onLeaderboard: () -> Unit,
     viewModel: GameViewModel = hiltViewModel(
         viewModelStoreOwner = LocalContext.current as ComponentActivity
@@ -90,15 +108,25 @@ fun GameRoute(
         tiles = uiState.tiles,
         moveGeneration = uiState.moveGeneration,
         score = uiState.score,
-        bestScore = uiState.bestScore,
+        moves = uiState.moves,
+        lowestMoves = uiState.lowestMoves,
         canUndo = uiState.canUndo,
         isWon = uiState.isWon,
         isGameOver = uiState.isGameOver,
         onSwipe = viewModel::onSwipe,
         onUndo = viewModel::undo,
-        onNewGame = viewModel::startNewGame,
-        onBack = onBack,
-        onLeaderboard = onLeaderboard
+        onHome = onHome,
+        onLeaderboard = onLeaderboard,
+        onOverlayAction = { action, name ->
+            if (action == "HOME") {
+                viewModel.recordScoreWithName(name)
+            }
+            when (action) {
+                "HOME" -> onHome()
+                "NEW_GAME" -> viewModel.startNewGame()
+                "LEADERBOARD" -> onLeaderboard()
+            }
+        }
     )
 }
 
@@ -108,15 +136,16 @@ fun GameScreen(
     tiles: List<TileData>,
     moveGeneration: Long,
     score: Int,
-    bestScore: Int,
+    moves: Int,
+    lowestMoves: Int,
     canUndo: Boolean,
     isWon: Boolean,
     isGameOver: Boolean,
     onSwipe: (Direction) -> Unit,
     onUndo: () -> Unit,
-    onNewGame: () -> Unit,
-    onBack: () -> Unit,
-    onLeaderboard: () -> Unit
+    onHome: () -> Unit,
+    onLeaderboard: () -> Unit,
+    onOverlayAction: (String, String) -> Unit
 ) {
     val highestTier = grid.maxOrNull() ?: 0
 
@@ -124,11 +153,6 @@ fun GameScreen(
         targetValue = score,
         animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
         label = "score"
-    )
-    val animatedBest by animateIntAsState(
-        targetValue = bestScore,
-        animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
-        label = "best"
     )
 
     var scoreDelta by remember { mutableIntStateOf(0) }
@@ -156,7 +180,7 @@ fun GameScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .padding(top = 48.dp, bottom = 16.dp, start = 20.dp, end = 20.dp)
         ) {
 
             Row(
@@ -179,8 +203,8 @@ fun GameScreen(
                     )
                 }
                 HudStatCard(
-                    label = "Best",
-                    value = animatedBest.toString(),
+                    label = "Moves",
+                    value = moves.toString(),
                     accent = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.weight(1f)
                 )
@@ -205,7 +229,7 @@ fun GameScreen(
                 ) {
                     NeonOutlinedButton(
                         text = "Home",
-                        onClick = onBack,
+                        onClick = onHome,
                         enabled = true,
                         accent = MaterialTheme.colorScheme.tertiary
                     )
@@ -240,8 +264,10 @@ fun GameScreen(
             isWon = isWon,
             isGameOver = isGameOver,
             score = score,
-            onNewGame = onNewGame,
-            onBack = onBack
+            onOverlayAction = onOverlayAction,
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(1f)
         )
     }
 }
@@ -350,8 +376,8 @@ private fun HudStatCard(
                 spreadAlpha = 0.35f
             ),
         shape = HudShape,
-        color = CyberBg.copy(alpha = 0.55f),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.55f)),
+        color = CyberBg.copy(alpha = 0.85f),
+        border = BorderStroke(1.5.dp, accent.copy(alpha = 0.75f)),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp
     ) {
@@ -383,9 +409,9 @@ private fun HudStatCard(
                 )
                 Text(
                     text = value,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White
                 )
             }
         }
@@ -467,78 +493,177 @@ private fun GameOverlay(
     isWon: Boolean,
     isGameOver: Boolean,
     score: Int,
-    onNewGame: () -> Unit,
-    onBack: () -> Unit
+    onOverlayAction: (String, String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
         visible = isWon || isGameOver,
-        enter = fadeIn(tween(500)),
-        exit = fadeOut(tween(300))
+        enter = fadeIn(tween(350)),
+        exit = fadeOut(tween(300)),
+        modifier = modifier
     ) {
-        val accent = if (isWon) NeonGold else NeonRed
-
+        val absorber = remember { MutableInteractionSource() }
+        var playerName by remember { mutableStateOf("") }
+        
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(CyberBg.copy(alpha = 0.80f)),
+                .background(Color(0xE603020E))
+                .clickable(
+                    interactionSource = absorber,
+                    indication = null,
+                    enabled = true,
+                    onClick = {}
+                ),
             contentAlignment = Alignment.Center
         ) {
-            Surface(
+            Column(
                 modifier = Modifier
-                    .padding(horizontal = 36.dp)
-                    .neonGlow(
-                        color = accent,
-                        cornerRadius = 18.dp,
-                        blurRadius = 28.dp,
-                        spreadAlpha = 0.35f
-                    ),
-                shape = OverlayCardShape,
-                color = CyberSurface.copy(alpha = 0.94f),
-                border = BorderStroke(2.dp, accent.copy(alpha = 0.65f))
+                    .fillMaxWidth()
+                    .padding(horizontal = 36.dp, vertical = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+                if (isWon) {
+                    val transition = rememberInfiniteTransition(label = "winPulse")
+                    val scale by transition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.04f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1500, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "winScale"
+                    )
+                    val glowAlpha by transition.animateFloat(
+                        initialValue = 0.45f,
+                        targetValue = 0.85f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1500, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "winGlow"
+                    )
+                    Image(
+                        painter = painterResource(id = R.drawable.sym_7),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(120.dp)
+                            .graphicsLayer { scaleX = scale; scaleY = scale }
+                            .neonGlow(
+                                color = NeonGold.copy(alpha = glowAlpha),
+                                cornerRadius = 60.dp,
+                                blurRadius = 36.dp,
+                                spreadAlpha = glowAlpha
+                            )
+                    )
                     Text(
-                        text = if (isWon) "ULTIMATE JOKER" else "GAME OVER",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = accent,
+                        text = "YOU WIN! 👑",
+                        style = TextStyle(
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Black,
+                            color = NeonGold,
+                            shadow = Shadow(color = NeonGold, blurRadius = 30f)
+                        ),
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        text = if (isWon) "You reached the highest tier!"
-                        else "No moves remaining",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = CyberOnDarkMuted,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "Score: $score",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        NeonOutlinedButton(
-                            text = "New Game",
-                            onClick = onNewGame,
-                            enabled = true,
-                            accent = accent
+                        text = "SCORE",
+                        style = TextStyle(
+                            fontSize = 10.sp,
+                            letterSpacing = 3.sp,
+                            color = Color.White.copy(alpha = 0.4f),
+                            fontWeight = FontWeight.Bold
                         )
-                        NeonOutlinedButton(
-                            text = "Home",
-                            onClick = onBack,
-                            enabled = true,
-                            accent = NeonCyan
+                    )
+                    Text(
+                        text = score.toString(),
+                        style = TextStyle(
+                            fontSize = 48.sp,
+                            fontWeight = FontWeight.Black,
+                            color = NeonGold,
+                            shadow = Shadow(color = NeonGold, blurRadius = 30f)
                         )
-                    }
+                    )
+                    OutlinedTextField(
+                        value = playerName,
+                        onValueChange = { playerName = it },
+                        placeholder = { Text("Enter your name", color = Color.White.copy(alpha=0.5f)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedIndicatorColor = NeonGold,
+                            unfocusedIndicatorColor = NeonGold.copy(alpha = 0.5f),
+                            cursorColor = NeonGold
+                        ),
+                        modifier = Modifier.fillMaxWidth(0.8f)
+                    )
+                    PrimaryGradientButton(
+                        text = "⚡ NEW GAME",
+                        onClick = { onOverlayAction("NEW_GAME", playerName) }
+                    )
+                    SecondaryGhostButton(
+                        text = "🏆 SAVE AND EXIT",
+                        onClick = { onOverlayAction("HOME", playerName) }
+                    )
+                } else {
+                    Text(
+                        text = "GAME OVER",
+                        style = TextStyle(
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Black,
+                            color = NeonRed,
+                            shadow = Shadow(color = NeonRed, blurRadius = 30f)
+                        ),
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = "FINAL SCORE",
+                        style = TextStyle(
+                            fontSize = 10.sp,
+                            letterSpacing = 3.sp,
+                            color = Color.White.copy(alpha = 0.4f),
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                    Text(
+                        text = score.toString(),
+                        style = TextStyle(
+                            fontSize = 48.sp,
+                            fontWeight = FontWeight.Black,
+                            color = NeonGold,
+                            shadow = Shadow(color = NeonGold, blurRadius = 30f)
+                        )
+                    )
+                    OutlinedTextField(
+                        value = playerName,
+                        onValueChange = { playerName = it },
+                        placeholder = { Text("Enter your name", color = Color.White.copy(alpha=0.5f)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedIndicatorColor = NeonRed,
+                            unfocusedIndicatorColor = NeonRed.copy(alpha = 0.5f),
+                            cursorColor = NeonRed
+                        ),
+                        modifier = Modifier.fillMaxWidth(0.8f)
+                    )
+                    PrimaryGradientButton(
+                        text = "⟳ NEW GAME",
+                        onClick = { onOverlayAction("NEW_GAME", playerName) }
+                    )
+                    SecondaryGhostButton(
+                        text = "← SAVE AND EXIT",
+                        onClick = { onOverlayAction("HOME", playerName) }
+                    )
                 }
             }
         }

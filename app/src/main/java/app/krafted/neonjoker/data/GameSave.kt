@@ -8,6 +8,7 @@ data class GameSave(
     @PrimaryKey val id: Int = 1,
     val gridState: String,
     val score: Int,
-    val bestScore: Int,
+    val moves: Int,
+    val lowestMoves: Int,
     val updatedAtMillis: Long = System.currentTimeMillis()
 )

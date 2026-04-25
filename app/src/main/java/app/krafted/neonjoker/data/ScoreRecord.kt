@@ -7,5 +7,7 @@ import androidx.room.PrimaryKey
 data class ScoreRecord(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val score: Int,
+    val moves: Int,
+    val playerName: String = "Player",
     val createdAtMillis: Long = System.currentTimeMillis()
 )

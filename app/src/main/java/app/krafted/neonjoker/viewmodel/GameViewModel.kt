@@ -104,7 +104,7 @@ class GameViewModel @Inject constructor(
                     TileData(
                         id = id,
                         cellIndex = move.toIndex,
-                        previousIndex = move.mergedFrom!!.first,
+                        previousIndex = move.mergedFrom?.first ?: move.toIndex,
                         tier = move.tier,
                         isMerged = true,
                     )
@@ -170,11 +170,6 @@ class GameViewModel @Inject constructor(
     fun recordScoreWithName(name: String) {
         val state = _uiState.value
         recordScore(state.moves, state.score, name.ifBlank { "Player" })
-    }
-
-    fun recordCurrentScore() {
-        val state = _uiState.value
-        recordScore(state.moves, state.score, "Player")
     }
 
     fun undo() {

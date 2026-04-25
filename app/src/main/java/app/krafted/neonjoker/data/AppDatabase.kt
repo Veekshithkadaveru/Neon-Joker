@@ -6,7 +6,7 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [GameSave::class, ScoreRecord::class],
     version = 4,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun gameDao(): GameDao

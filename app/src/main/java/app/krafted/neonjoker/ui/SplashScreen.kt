@@ -59,9 +59,9 @@ fun SplashScreen(onNavigateNext: () -> Unit) {
         )
         alpha.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 800)
+            animationSpec = tween(durationMillis = 600)
         )
-        delay(1500)
+        delay(300)
         onNavigateNext()
     }
 

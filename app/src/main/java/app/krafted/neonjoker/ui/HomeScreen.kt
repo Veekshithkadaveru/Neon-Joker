@@ -64,7 +64,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import app.krafted.neonjoker.R
 import app.krafted.neonjoker.ui.components.PrimaryGradientButton
 import app.krafted.neonjoker.ui.components.SecondaryGhostButton
@@ -96,7 +96,9 @@ fun HomeRoute(
     onContinue: () -> Unit,
     onLeaderboard: () -> Unit,
     viewModel: GameViewModel = hiltViewModel(
-        viewModelStoreOwner = LocalContext.current as ComponentActivity
+        viewModelStoreOwner = requireNotNull(LocalContext.current as? ComponentActivity) {
+            "HomeRoute must be hosted in a ComponentActivity"
+        }
     )
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -442,24 +444,12 @@ private fun MovesCard(moves: Int) {
                     ),
                 )
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Image(
-                    painter = painterResource(id = R.drawable.sym_7),
-                    contentDescription = null,
-                    modifier = Modifier.size(38.dp),
-                    contentScale = ContentScale.Fit
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "#1",
-                    style = TextStyle(
-                        fontSize = 8.sp,
-                        letterSpacing = 1.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = NeonGold.copy(alpha = 0.45f),
-                    )
-                )
-            }
+            Image(
+                painter = painterResource(id = R.drawable.sym_7),
+                contentDescription = null,
+                modifier = Modifier.size(38.dp),
+                contentScale = ContentScale.Fit
+            )
         }
     }
 }

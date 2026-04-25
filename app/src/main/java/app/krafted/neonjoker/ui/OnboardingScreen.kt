@@ -26,6 +26,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -143,6 +144,19 @@ fun OnboardingScreen(onFinish: () -> Unit) {
             // Space placeholder if button not visible
             if (!isLastPage) {
                 Spacer(modifier = Modifier.height(104.dp))
+            }
+        }
+
+        if (!isLastPage) {
+            TextButton(
+                onClick = onFinish,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(end = 8.dp),
+                colors = ButtonDefaults.textButtonColors(contentColor = Color.White.copy(alpha = 0.75f))
+            ) {
+                Text("Skip", fontWeight = FontWeight.SemiBold)
             }
         }
     }

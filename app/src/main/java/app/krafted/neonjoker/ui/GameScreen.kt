@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -71,7 +72,7 @@ import androidx.compose.ui.zIndex
 import app.krafted.neonjoker.R
 import app.krafted.neonjoker.ui.components.PrimaryGradientButton
 import app.krafted.neonjoker.ui.components.SecondaryGhostButton
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import app.krafted.neonjoker.game.Direction
 import app.krafted.neonjoker.ui.components.AnimatedTile
 import app.krafted.neonjoker.ui.components.TierProgress
@@ -99,7 +100,9 @@ fun GameRoute(
     onHome: () -> Unit,
     onLeaderboard: () -> Unit,
     viewModel: GameViewModel = hiltViewModel(
-        viewModelStoreOwner = LocalContext.current as ComponentActivity
+        viewModelStoreOwner = requireNotNull(LocalContext.current as? ComponentActivity) {
+            "GameRoute must be hosted in a ComponentActivity"
+        }
     )
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -118,9 +121,7 @@ fun GameRoute(
         onHome = onHome,
         onLeaderboard = onLeaderboard,
         onOverlayAction = { action, name ->
-            if (action == "HOME") {
-                viewModel.recordScoreWithName(name)
-            }
+            viewModel.recordScoreWithName(name)
             when (action) {
                 "HOME" -> onHome()
                 "NEW_GAME" -> viewModel.startNewGame()
@@ -520,6 +521,7 @@ private fun GameOverlay(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .imePadding()
                     .padding(horizontal = 36.dp, vertical = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(18.dp)

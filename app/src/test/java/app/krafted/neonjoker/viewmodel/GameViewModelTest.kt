@@ -194,4 +194,30 @@ class GameViewModelTest {
         assertEquals(1, vm.uiState.value.grid[0])
         assertEquals(2, vm.uiState.value.grid[5])
     }
+
+    @Test
+    fun initDoesNotContinueWonSavedGame() = runTest {
+        val wonGrid = "7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
+        fakeDao.upsertGameSave(GameSave(gridState = wonGrid, score = 128, bestScore = 128))
+        val vm = GameViewModel(fakeDao)
+
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.isWon)
+        assertFalse(vm.uiState.value.canContinue)
+    }
+
+    @Test
+    fun winningSwipeDisablesContinue() = runTest {
+        val almostWonGrid = "6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
+        fakeDao.upsertGameSave(GameSave(gridState = almostWonGrid, score = 0, bestScore = 0))
+        val vm = GameViewModel(fakeDao)
+        advanceUntilIdle()
+
+        vm.onSwipe(Direction.LEFT)
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.isWon)
+        assertFalse(vm.uiState.value.canContinue)
+    }
 }

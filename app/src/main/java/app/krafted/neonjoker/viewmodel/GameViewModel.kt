@@ -63,13 +63,18 @@ class GameViewModel @Inject constructor(
             if (save != null) {
                 val gridValues = parseGridState(save.gridState)
                 val restoredTiles = buildTilesFromGrid(gridValues)
+                val restoredGrid = Grid(gridValues.toIntArray())
+                val won = isWon(restoredGrid)
+                val gameOver = !won && isGameOver(restoredGrid)
                 _uiState.update {
                     it.copy(
                         grid = gridValues,
                         tiles = restoredTiles,
                         score = save.score,
                         bestScore = maxOf(it.bestScore, save.bestScore),
-                        canContinue = true
+                        canContinue = !won && !gameOver,
+                        isWon = won,
+                        isGameOver = gameOver,
                     )
                 }
             }
@@ -136,7 +141,7 @@ class GameViewModel @Inject constructor(
         val afterSpawn = spawnResult.grid
         val newScore = state.score + result.scoreDelta
         val newBest = maxOf(state.bestScore, newScore)
-        val won = afterSpawn.values.any { it >= Grid.MAX_TIER }
+        val won = isWon(afterSpawn)
         val gameOver = !won && isGameOver(afterSpawn)
 
         _uiState.value = state.copy(
@@ -147,7 +152,7 @@ class GameViewModel @Inject constructor(
             isWon = won,
             isGameOver = gameOver,
             canUndo = true,
-            canContinue = !gameOver,
+            canContinue = !won && !gameOver,
             moveGeneration = state.moveGeneration + 1,
         )
 
@@ -233,6 +238,10 @@ class GameViewModel @Inject constructor(
     private fun isGameOver(grid: Grid): Boolean {
         if (spawner.hasEmptyCell(grid)) return false
         return Direction.entries.none { GridEngine.slide(grid, it).moved }
+    }
+
+    private fun isWon(grid: Grid): Boolean {
+        return grid.values.any { it >= Grid.MAX_TIER }
     }
 
     private fun parseGridState(raw: String): List<Int> {
